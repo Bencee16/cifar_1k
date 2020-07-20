@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
+from torch.utils.data import SubsetRandomSampler
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,54 +10,94 @@ import time
 import copy
 
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-
-import torchvision.models as models
-
 
 from tests import shape_test
 from utils import initialize_model, set_params_to_update, count_trainable_parameters
 
 
 input_size = 224
-batch_size = 32
+batch_size = 64
 NUM_TRAIN = 49000
 NUM_VAL = 1000
-num_epochs = 5
-model_name = "resnet"
-feature_extract = True
-
-
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-num_classes = len(classes)
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+num_epochs = 5000
+model_name = "resnet18"
+feature_extract = False
 
 
 transform_train = transforms.Compose(
-    [transforms.Resize(input_size),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
-
-transform_eval = transforms.Compose(
-    [transforms.Resize(input_size),
+    [transforms.RandomResizedCrop(input_size),
+     transforms.RandomHorizontalFlip(),
      transforms.ToTensor(),
      transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
 
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                        download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                          shuffle=True, num_workers=2)
+transform_eval = transforms.Compose(
+    [transforms.Resize(256),
+     transforms.CenterCrop(input_size),
+     transforms.ToTensor(),
+     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
 
-testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                       download=True, transform=transform_eval)
+indices = {'train': list(range(45000)),
+           'val': list(range(45000, 50000))}
+
+
+####################
+
+
+class MyDataset(torch.utils.data.Dataset):
+    def __init__(self, phase):
+        if phase == 'train':
+            self.cifar10 = torchvision.datasets.CIFAR10(root='./data',
+                                                        download=True,
+                                                        train=True,
+                                                        transform=transform_train)
+        elif phase == 'val':
+            self.cifar10 = torchvision.datasets.CIFAR10(root='./data',
+                                                        download=True,
+                                                        train=True,
+                                                        transform=transform_eval)
+        elif phase == 'test':
+            self.cifar10 = torchvision.datasets.CIFAR10(root='./data',
+                                                        download=True,
+                                                        train=False,
+                                                        transform=transform_eval)
+
+    def __getitem__(self, index):
+        data, target = self.cifar10[index]
+
+        return data, target, index
+
+    def __len__(self):
+        return len(self.cifar10)
+
+
+trainset = MyDataset('train')
+trainloader = torch.utils.data.DataLoader(trainset,
+                                          batch_size=batch_size,
+                                          sampler=SubsetRandomSampler(indices['train']),
+                                          num_workers=2)
+
+valset = MyDataset('val')
+valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
+                                        sampler=SubsetRandomSampler(indices['val']),
+                                        num_workers=2)
+
+testset = MyDataset('test')
 testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                         shuffle=True, num_workers=2)
+                                         shuffle=True,
+                                         num_workers=2)
 
+toyset = torch.utils.data.Subset(trainset, list(range(batch_size)))
 
-dataloaders_dict = {"train": trainloader, "test": testloader}
+toyloader = torch.utils.data.DataLoader(toyset, batch_size=batch_size,
+                                        # sampler=SubsetRandomSampler(list(range(10))),
+                                        sampler=SequentialSampler(toyset),
+                                        num_workers=2)
 
+dataloaders_dict = {"train": toyloader, "val": valloader, "test": testloader, "toy": toyloader}
+
+classes = ('plane', 'car', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 
 
@@ -73,7 +114,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
         print('-' * 10)
 
         # Each epoch has a training and validation phase
-        for phase in ['train', 'test']:
+        for phase in ['train']:
             if phase == 'train':
                 model.train()  # Set model to training mode
             else:
@@ -110,12 +151,11 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
 
-            print(f'At {phase}, the length of the dataset is {len(dataloaders[phase].dataset)}')
-
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+
+            print('{} Loss: {:.4f} Acc: {:.4f} corrects: {}'.format(phase, epoch_loss, epoch_acc, running_corrects))
 
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
