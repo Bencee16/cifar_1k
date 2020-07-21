@@ -2,6 +2,8 @@ import torch
 import torchvision.models as models
 import torch.nn as nn
 
+import os
+import json
 
 def set_parameter_requires_grad(model, freeze_weights):
     if freeze_weights:
@@ -81,3 +83,22 @@ def create_coreset(forgetting_stats, trainset, batch_size, train_indices, device
 
     return coreset, coreloader
 
+
+def create_folder(path, modelname, config):
+    if modelname not in os.listdir(path):
+        os.mkdir(path + modelname)
+        with open(path + modelname + '/config.txt', 'w') as outfile:
+            json.dump(config, outfile)
+
+
+def save_model(model, acc_history, forgetting_stats, modelname, path, config, task):
+    # saving config, model, accuracy, history, forgetting_stats
+    print('Saving results')
+
+    create_folder(path, modelname, config)
+    if task == 'proxy':
+        torch.save(forgetting_stats, path + modelname + '/forgetting_stats')
+    torch.save(acc_history, path + modelname + '/' + task + '_acc_history')
+    torch.save(model.state_dict(), path + modelname + task + '.pth')
+    with open(f'{path + modelname}/{task}_test_accuracy.txt', 'w') as f:
+        f.write(str(acc_history['test']))
