@@ -1,0 +1,10 @@
+name: docler_cifar
+channels:
+  - defaults
+dependencies:
+  - python=3.6.8
+  - anaconda
+  - cudatoolkit=10.0
+  - torchvision
+  - pytorch
+
