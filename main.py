@@ -14,7 +14,7 @@ from dataloader import load_data
 from unit_tests import forgetting_test, shape_test
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=32)
+parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--num_epochs_proxy', type=int, default=20)
 parser.add_argument('--num_epochs_core', type=int, default=150)
 parser.add_argument('--model_type_proxy', default="resnet18")
@@ -30,7 +30,6 @@ parser.add_argument('--continue_from_selection', type=bool, default=False)
 parser.add_argument('--dropout', type=bool, default=False)
 
 
-
 def main(args):
 
     PATH = './'
@@ -38,7 +37,6 @@ def main(args):
     forgetting_path = "preloaded_forgetting/forgetting_stats"
 
     batch_size = args.batch_size
-    print(batch_size)
     num_epochs = {'proxy': args.num_epochs_proxy, 'core': args.num_epochs_core}
     model_type = {'proxy': args.model_type_proxy, 'core': args.model_type_core}
     use_pretrained = {'proxy': args.use_pretrained_proxy, 'core': args.use_pretrained_core}
@@ -131,7 +129,6 @@ def main(args):
 
     full_time = round(sum([v for (_, v) in times.items()]))
     print(f'The end-to-end training took {full_time//3600}h, {(full_time %3600)// 60}m, {full_time % 60}s')
-
 
 
 if __name__ == "__main__":
