@@ -69,6 +69,6 @@ def load_data(batch_size, indices):
                                             sampler=SequentialSampler(toyset),
                                             num_workers=2)
 
-    dataloaders = {"train": toyloader, "val": valloader, "test": testloader, "toy": toyloader}
+    dataloaders = {"train": trainloader, "val": valloader, "test": testloader, "toy": toyloader}
 
     return trainset, valset, testset, dataloaders
